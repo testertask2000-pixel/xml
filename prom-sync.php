@@ -8,7 +8,7 @@ $url = 'https://trikobakh.com/catalog-roles.xml?groups%5B%5D=23&groups%5B%5D=46&
 
 $temp_file = __DIR__ . '/temp_trikobakh.xml';
 // Змінив назву файлу, щоб він гарантовано згенерувався заново
-$final_file = __DIR__ . '/prom_v2.xml'; 
+$final_file = __DIR__ . '/prom_v3.xml'; 
 
 if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
 
@@ -48,9 +48,12 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                             $available = 'true';
                         }
 
-                        // Тепер ми віддаємо Прому ЦІНУ та ФОТО
+                        // РАХУЄМО НАЦІНКУ +25%
+                        $final_retail_price = round($retail_price * 1.25);
+
+                        // Тепер ми віддаємо Прому ЦІНУ З НАЦІНКОЮ та ФОТО
                         $offer_output = '    <offer id="' . $offer_id . '" available="' . $available . '">' . "\n";
-                        $offer_output .= '        <price>' . $retail_price . '</price>' . "\n";
+                        $offer_output .= '        <price>' . $final_retail_price . '</price>' . "\n";
                         
                         if (isset($offer_node->name)) {
                             $offer_output .= '        <name>' . htmlspecialchars((string)$offer_node->name) . '</name>' . "\n";
