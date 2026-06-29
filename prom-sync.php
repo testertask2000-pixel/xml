@@ -7,8 +7,8 @@ ini_set('memory_limit', '512M');
 $url = 'https://trikobakh.com/catalog-roles.xml?groups%5B%5D=23&groups%5B%5D=46&groups%5B%5D=48&groups%5B%5D=30&groups%5B%5D=7&groups%5B%5D=5&groups%5B%5D=10&groups%5B%5D=20&groups%5B%5D=31&groups%5B%5D=8&groups%5B%5D=34&groups%5B%5D=4&groups%5B%5D=6&groups%5B%5D=32&groups%5B%5D=33&groups%5B%5D=9&groups%5B%5D=13&groups%5B%5D=18';
 
 $temp_file = __DIR__ . '/temp_trikobakh.xml';
-// Змінив назву на v5, щоб Render гарантовано перегенерував файл
-$final_file = __DIR__ . '/prom_v5.xml'; 
+// Змінив назву на v6
+$final_file = __DIR__ . '/prom_v6.xml'; 
 
 if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
 
@@ -34,7 +34,7 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
 
         $reader = new XMLReader();
         if ($reader->open($temp_file)) {
-            $test_limit = 5; // Тест на 5 товарів залишається
+            $test_limit = 5; // Залишаємо 5 товарів для тесту
             $loaded_count = 0;
 
             while ($reader->read()) {
@@ -59,12 +59,14 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                         // Націнка +25%
                         $final_retail_price = round($retail_price * 1.25);
 
-                        // Формуємо XML БЕЗ <name>
                         $offer_output = '    <offer id="' . $offer_id . '" available="' . $available . '">' . "\n";
                         $offer_output .= '        <price>' . $final_retail_price . '</price>' . "\n";
                         $offer_output .= '        <vendorCode>' . $offer_id . '</vendorCode>' . "\n";
                         
-                        // Блок з <name> повністю видалено!
+                        // ПОВЕРТАЄМО НАЗВУ ДЛЯ ВАЛІДАЦІЇ ПРОМОМ
+                        if (isset($offer_node->name)) {
+                            $offer_output .= '        <name>' . htmlspecialchars((string)$offer_node->name) . '</name>' . "\n";
+                        }
                         
                         if (isset($offer_node->picture)) {
                             foreach ($offer_node->picture as $pic) {
