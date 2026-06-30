@@ -4,12 +4,10 @@ ini_set('display_errors', 1);
 ini_set('max_execution_time', 0);
 ini_set('memory_limit', '512M');
 
-// Нове посилання тільки з новою колекцією (group 23)
 $url = 'https://trikobakh.com/catalog-roles.xml?groups%5B%5D=23';
 
 $temp_file = __DIR__ . '/temp_trikobakh.xml';
-// Змінив назву файлу на prom_final.xml, щоб сервер примусово згенерував його заново без старих лімітів
-$final_file = __DIR__ . '/prom_final.xml'; 
+$final_file = __DIR__ . '/prom_final_v2.xml'; 
 
 if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
 
@@ -41,6 +39,9 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                     $offer_node = @simplexml_load_string($offer_xml);
                     if ($offer_node) {
                         $offer_id = (string)$offer_node['id'];
+                        // Витягуємо group_id для різновидів
+                        $group_id = isset($offer_node['group_id']) ? (string)$offer_node['group_id'] : '';
+                        
                         $retail_price = (float)$offer_node->price;
                         $drop_price = (float)$offer_node->price_input;
 
@@ -49,10 +50,15 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                             $available = 'true';
                         }
 
-                        // Націнка +25%
                         $final_retail_price = round($retail_price * 1.25);
 
-                        $offer_output = '    <offer id="' . $offer_id . '" available="' . $available . '">' . "\n";
+                        // Додаємо group_id у тег offer, якщо він є
+                        $offer_output = '    <offer id="' . $offer_id . '" available="' . $available . '"';
+                        if ($group_id !== '') {
+                            $offer_output .= ' group_id="' . $group_id . '"';
+                        }
+                        $offer_output .= '>' . "\n";
+                        
                         $offer_output .= '        <price>' . $final_retail_price . '</price>' . "\n";
                         $offer_output .= '        <vendorCode>' . $offer_id . '</vendorCode>' . "\n";
                         
@@ -60,9 +66,13 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                             $offer_output .= '        <name>' . htmlspecialchars((string)$offer_node->name) . '</name>' . "\n";
                         }
                         
+                        // ОБМЕЖЕННЯ: Максимум 10 фото для Прому
                         if (isset($offer_node->picture)) {
+                            $pic_count = 0;
                             foreach ($offer_node->picture as $pic) {
+                                if ($pic_count >= 10) break; 
                                 $offer_output .= '        <picture>' . htmlspecialchars((string)$pic) . '</picture>' . "\n";
+                                $pic_count++;
                             }
                         }
                         
