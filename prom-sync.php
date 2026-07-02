@@ -7,7 +7,8 @@ ini_set('memory_limit', '512M');
 $url = 'https://trikobakh.com/catalog-roles.xml?groups%5B%5D=23';
 
 $temp_file = __DIR__ . '/temp_trikobakh.xml';
-$final_file = __DIR__ . '/prom_final_v3.xml'; 
+// Змінив назву фінального файлу, щоб скинути кеш
+$final_file = __DIR__ . '/prom_final_v4.xml'; 
 $history_file = __DIR__ . '/trikobakh_history.json';
 
 // Завантажуємо історію товарів, якщо вона існує
@@ -38,7 +39,7 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
         fwrite($out, '<shop>' . "\n");
         fwrite($out, '<offers>' . "\n");
 
-        $current_ids = []; // Сюди збираємо ID, які є в поточному файлі постачальника
+        $current_ids = []; 
 
         $reader = new XMLReader();
         if ($reader->open($temp_file)) {
@@ -49,6 +50,9 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                     if ($offer_node) {
                         $offer_id = (string)$offer_node['id'];
                         $group_id = isset($offer_node['group_id']) ? (string)$offer_node['group_id'] : '';
+                        
+                        // ВИТЯГУЄМО ПРАВИЛЬНИЙ АРТИКУЛ
+                        $vendor_code = isset($offer_node->vendorCode) ? (string)$offer_node->vendorCode : $offer_id;
                         
                         $retail_price = (float)$offer_node->price;
                         $drop_price = (float)$offer_node->price_input;
@@ -61,24 +65,27 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                         $final_retail_price = round($retail_price * 1.25);
                         $item_name = isset($offer_node->name) ? (string)$offer_node->name : '';
 
-                        // Фіксуємо, що цей товар зараз є в наявності
+                        // Фіксуємо наявність
                         $current_ids[$offer_id] = true;
 
-                        // Оновлюємо або додаємо товар в історію
+                        // Оновлюємо історію
                         $history[$offer_id] = [
                             'group_id' => $group_id,
                             'price' => $final_retail_price,
-                            'name' => $item_name
+                            'name' => $item_name,
+                            'vendor_code' => $vendor_code // Зберігаємо артикул
                         ];
 
-                        // Формуємо XML для поточного товару
                         $offer_output = '    <offer id="' . $offer_id . '" available="' . $available . '"';
                         if ($group_id !== '') {
                             $offer_output .= ' group_id="' . $group_id . '"';
                         }
                         $offer_output .= '>' . "\n";
                         $offer_output .= '        <price>' . $final_retail_price . '</price>' . "\n";
-                        $offer_output .= '        <vendorCode>' . $offer_id . '</vendorCode>' . "\n";
+                        
+                        // ВІДДАЄМО ПРАВИЛЬНИЙ АРТИКУЛ
+                        $offer_output .= '        <vendorCode>' . htmlspecialchars($vendor_code) . '</vendorCode>' . "\n";
+                        
                         if ($item_name !== '') {
                             $offer_output .= '        <name>' . htmlspecialchars($item_name) . '</name>' . "\n";
                         }
@@ -101,8 +108,7 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
             $reader->close();
         }
 
-        // ВАЖЛИВА ЧАСТИНА: Перевіряємо історію. 
-        // Якщо товар був раніше, але зник з поточного файлу постачальника — виводимо його як available="false"
+        // Перевірка історії для відсутніх товарів
         foreach ($history as $old_id => $data) {
             if (!isset($current_ids[$old_id])) {
                 $offer_output = '    <offer id="' . $old_id . '" available="false"';
@@ -111,7 +117,11 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
                 }
                 $offer_output .= '>' . "\n";
                 $offer_output .= '        <price>' . $data['price'] . '</price>' . "\n";
-                $offer_output .= '        <vendorCode>' . $old_id . '</vendorCode>' . "\n";
+                
+                // Використовуємо збережений артикул
+                $hist_vc = isset($data['vendor_code']) ? $data['vendor_code'] : $old_id;
+                $offer_output .= '        <vendorCode>' . htmlspecialchars($hist_vc) . '</vendorCode>' . "\n";
+                
                 if (!empty($data['name'])) {
                     $offer_output .= '        <name>' . htmlspecialchars($data['name']) . '</name>' . "\n";
                 }
@@ -126,7 +136,7 @@ if (!file_exists($final_file) || (time() - filemtime($final_file)) > 7200) {
         fwrite($out, '</yml_catalog>');
         fclose($out);
 
-        // Зберігаємо оновлену історію в JSON файл
+        // Зберігаємо оновлену історію
         file_put_contents($history_file, json_encode($history, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
     @unlink($temp_file);
